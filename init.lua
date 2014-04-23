@@ -92,61 +92,23 @@ minetest.register_on_player_receive_fields(function(player,formname,fields)
 	end
 	
 	if fields.p_add and fields.p_name and fields.p_note then -- add note
-		local target = fields.p_name
-		local note = fields.p_note
-		if not minetest.auth_table[target] then
-			minetest.chat_send_player(player_name, "Unknown player: "..target)
-			return
-		end
-		if string.len(note) < 2 or string.len(note) > 60 then
-			minetest.chat_send_player(player_name, "Note is too short or too long to add. Sorry.")
-			return
-		end
-		if not player_notes.player[target] then
-			player_notes.player[target] = {}
-		end
-		-- generate random key
-		local key = tostring(math.random(player_notes.key_min, player_notes.key_max))
-		if player_notes.enable_timestamp ~= "" then
-			player_notes.player[target][key] = "<"..player_name.." ("..os.date(player_notes.enable_timestamp)..")> "..note
+		local back_err = player_notes.add_note(player_name, fields.p_name, fields.p_note)
+		if not back_err then
+			minetest.chat_send_player(player_name, "Added note!")
+			player_notes.save_data()
 		else
-			player_notes.player[target][key] = "<"..player_name.."> "..note
+			minetest.chat_send_player(player_name, back_err)
 		end
-		minetest.chat_send_player(player_name, "Added note!")
-		player_notes.save_data()
 		return
 	end
 	if fields.p_rm and fields.p_key then -- ReMove note
-		local target = player_notes.mgr[player_name].data
-		local key = fields.p_key
-		if not player_notes.player[target] then
-			minetest.chat_send_player(player_name, "Player has no notes so far.")
-			return
+		local back_err = player_notes.rm_note(player_notes.mgr[player_name].data, fields.p_key)
+		if not back_err then
+			minetest.chat_send_player(player_name, "Removed note!")
+			player_notes.save_data()
+		else
+			minetest.chat_send_player(player_name, back_err)
 		end
-		-- must be unique key
-		key = tonumber(key)
-		if not key then
-			minetest.chat_send_player(player_name, "Key must be a number!")
-			return
-		end
-		if not player_notes.player[target][tostring(key)] then
-			minetest.chat_send_player(player_name, "Key does not exist. Can not remove unknown note.")
-			return
-		end
-		player_notes.player[target][tostring(key)] = nil
-		local delete = true
-		for key, note in pairs(player_notes.player[target]) do
-			if string.len(note) > 2 then
-				delete = false
-				break
-			end
-		end
-		-- remove empty players
-		if delete then
-			player_notes.player[target] = nil
-		end
-		minetest.chat_send_player(player_name, "Removed note!")
-		player_notes.save_data()
 		minetest.show_formspec(player_name, "player_notes:conf", player_notes.get_formspec(2, player_name))
 	end
 end)

@@ -44,4 +44,55 @@ player_notes.save_data = function()
 	io.close(file)
 end
 
--- string2 = string.gsub(string2, "|", "/")
+player_notes.add_note = function(name, target, note)
+	if not name or not target or not note then
+		return "ERROR: Name, target or note == NIL"
+	end
+	if not minetest.auth_table[target] then
+		return "Unknown player: "..target
+	end
+	if string.len(note) < 2 or string.len(note) > 60 then
+		return "Note is too short or too long to add. Sorry."
+	end
+	if not player_notes.player[target] then
+		player_notes.player[target] = {}
+	end
+	-- generate random key
+	local key = tostring(math.random(player_notes.key_min, player_notes.key_max))
+	if player_notes.enable_timestamp ~= "" then
+		player_notes.player[target][key] = "<"..name.." ("..os.date(player_notes.enable_timestamp)..")> "..note
+	else
+		player_notes.player[target][key] = "<"..name.."> "..note
+	end
+	return nil
+end
+
+player_notes.rm_note = function(target, key)
+	if not target or not key then
+		return "ERROR: Target or key == NIL"
+	end
+	if not player_notes.player[target] then
+		return "Player has no notes so far."
+	end
+	-- must be unique key
+	key = tonumber(key)
+	if not key then
+		return "Key must be a number!"
+	end
+	if not player_notes.player[target][tostring(key)] then
+		return "Key does not exist. Can not remove unknown note."
+	end
+	player_notes.player[target][tostring(key)] = nil
+	local delete = true
+	for key, note in pairs(player_notes.player[target]) do
+		if string.len(note) > 2 then
+			delete = false
+			break
+		end
+	end
+	-- remove empty players
+	if delete then
+		player_notes.player[target] = nil
+	end
+	return nil
+end

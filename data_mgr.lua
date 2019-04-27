@@ -1,5 +1,3 @@
--- Created by Krock
--- License: WTFPL
 
 player_notes.load_data = function()
 	local file = io.open(player_notes.data_file, "r")
@@ -30,25 +28,27 @@ end
 minetest.after(3, player_notes.load_data)
 
 player_notes.save_data = function()
-	local file = io.open(player_notes.data_file, "w")
+	local contents = {}
 	for player, notes in pairs(player_notes.player) do
-		local str = ""
+		local line = {}
 		for key, _note in pairs(notes) do
 			local note = string.gsub(_note, "|", "/")
-			str = str..key.."|"..note.."|"
+			line[#line + 1] = key .. "|" .. note
 		end
-		if string.len(str) > 2 then
-			file:write(player.."|"..str.."\n")
+		if #line > 0 then
+			contents[#contents + 1] = player .. "|"
+				.. table.concat(line, "|")
 		end
 	end
-	io.close(file)
+	minetest.safe_file_write(player_notes.data_file,
+		table.concat(contents, "\n"))
 end
 
 player_notes.add_note = function(name, target, note)
 	if not name or not target or not note then
 		return "ERROR: Name, target or note == NIL"
 	end
-	if not minetest.auth_table[target] then
+	if not minetest.player_exists(target) then
 		return "Unknown player: "..target
 	end
 	if string.len(note) < 2 or string.len(note) > 60 then
@@ -57,14 +57,24 @@ player_notes.add_note = function(name, target, note)
 	if not player_notes.player[target] then
 		player_notes.player[target] = {}
 	end
-	-- generate random key
-	local key = tostring(math.random(player_notes.key_min, player_notes.key_max))
+	local notes = player_notes.player[target]
+	local message
 	if player_notes.enable_timestamp ~= "" then
-		player_notes.player[target][key] = "<"..name.." ("..os.date(player_notes.enable_timestamp)..")> "..note
+		message = "<"..name.." ("..
+				os.date(player_notes.enable_timestamp)..")> "..note
 	else
-		player_notes.player[target][key] = "<"..name.."> "..note
+		message = "<"..name.."> "..note
 	end
-	return nil
+
+	-- generate a unique key
+	local key = minetest.sha1(message)
+	key = tonumber(string.sub(key, 1, 4), 16)
+		% (player_notes.key_max - player_notes.key_min + 1)
+		+ player_notes.key_min
+	if notes[tostring(key)] then
+		return "Note already exists." -- maybe. Chances 1/899
+	end
+	notes[tostring(key)] = message
 end
 
 player_notes.rm_note = function(target, key)
